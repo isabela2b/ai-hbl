@@ -25,14 +25,12 @@ def compare():
     """
     predictions = {}
     params = request.args
-    print(params)
     if (params == None):
         params = request.args
 
     # if parameters are found, return a prediction
     if (params != None):
         #try:
-        print("request received")
         user_id = request.form['user_id']
         process_id = request.form['process_id']
 
@@ -43,7 +41,6 @@ def compare():
             return extract_compare(response.content, filename, user_id, process_id)
         else:
             file_obj = request.files.getlist('file')[0]
-            print(file_obj)
             if file_obj.filename != '':
                 return extract_compare(file_obj.read(), file_obj.filename, user_id, process_id)
             else:

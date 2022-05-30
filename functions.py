@@ -2,14 +2,15 @@ import numpy as np
 import pandas as pd 
 import cv2
 import copy
-#import keras
+import keras
 import os, shutil
 
 from datetime import datetime
 from PyPDF2 import PdfFileWriter, PdfFileReader
-#from pdf2image import convert_from_path
-#from PIL import Image
+from pdf2image import convert_from_path
+from PIL import Image
 
+hbl_page_model = keras.models.load_model('models/hbl_page.h5')
 ALLOWED_EXTENSIONS = set(['pdf', 'png', 'jpg', 'jpeg', 'bmp', 'docx', 'xlsx', 'xls','tiff'])
 
 #poppler_path = r"C:\Program Files\poppler-21.03.0\Library\bin"
@@ -33,3 +34,8 @@ def img_preprocess(image, image_size):
     im = np.array(im)/255
     im = np.expand_dims(im, axis=0)
     return im
+
+def hbl_page(image):
+    image = img_preprocess(image, 224)
+    pred=hbl_page_model.predict(image)
+    return round(pred[0][0])

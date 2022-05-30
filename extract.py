@@ -1,10 +1,11 @@
-import os, shutil, json, glob, re, requests, io #keras
+import os, shutil, json, glob, re, requests, io, cv2 #keras
 import pandas as pd
 import numpy as np
 import pymssql
 from pymssql import _mssql
 from pdf2image import convert_from_bytes
 from PyPDF2 import PdfFileMerger
+from PIL import Image
 
 from functions import * 
 
@@ -18,7 +19,7 @@ document_analysis_client = DocumentAnalysisClient(endpoint, credential)
 default_model_id = "hbl1"
 data_folder = "../ai-data/test-ftp-folder/"
 #data_folder = "E:/A2BFREIGHT_MANAGER/"
-#poppler_path = r"C:\Program Files\poppler-21.03.0\Library\bin"
+poppler_path = r"C:\Program Files\poppler-21.03.0\Library\bin"
 
 def container_separate(containers):
     """
@@ -35,13 +36,10 @@ def filename_filter(filename):
     """
     return re.sub('[^A-Za-z0-9]+', '', filename)
 
-def form_recognizer_one(path, file_name, page_num, model_id=default_model_id):
+def form_recognizer_one(document, file_name, page_num, model_id=default_model_id):
     prediction={}
 
     table = {'container_number': [], 'seal': [], 'container_type':[], 'chargeable_weight':[], 'volume': [], 'package_count': []}
-    with open(path, "rb") as fd:
-            document = fd.read()
-
     poller = document_analysis_client.begin_analyze_document(model=model_id, document=document)
     result = poller.result()
 
@@ -135,7 +133,7 @@ def push_parsed_inv(predictions, process_id, user_id):
 
 
 def extract_compare(file_bytes, filename, user_id, process_id):
-    url = "https://cargomation.com:5200/redis/apinvoice/compare"
+    #url = "https://cargomation.com:5200/redis/apinvoice/compare"
     predictions = {}
     shared_invoice = {} #page and invoice number
     user_query = query_webservice_user(user_id)
@@ -152,6 +150,8 @@ def extract_compare(file_bytes, filename, user_id, process_id):
                 print("Decryption error")
         #classify and split
         for page, image in enumerate(images):
+            print(type(image))
+            if hbl_page(image) == 1:
                 #pred = classify_carrier(image)
                 output = PdfFileWriter()
                 output.addPage(inputpdf.getPage(page)) #pages begin at zero in pdffilewriter
@@ -160,20 +160,22 @@ def extract_compare(file_bytes, filename, user_id, process_id):
                 split_file_path = data_folder+"SPLIT/"+split_file_name
                 with open(split_file_path, "wb") as outputStream:
                     output.write(outputStream) #this can be moved to only save when the split file is AP
-
-                predictions[split_file_name] = form_recognizer_one(path=split_file_path, file_name=filename, page_num=page_num)
+                fd = open(split_file_path, "rb")
+                predictions[split_file_name] = form_recognizer_one(document=fd.read(), file_name=filename, page_num=page_num)
                 shared_invoice[split_file_name] = predictions[split_file_name]['hbl_number']
 
-    elif ext in ["jpg", "jpeg", "png",'.bmp','.tiff']:
-        pil_image = Image.open(file_bytes)
+        predictions = multipage_combine(predictions, shared_invoice)
 
+    elif ext in ["jpg", "jpeg", "png",'.bmp','.tiff']:
+        pil_image = Image.open(io.BytesIO(file_bytes)).convert('L').convert('RGB') 
+        if hbl_page(pil_image) == 1:
+            predictions[filename] = form_recognizer_one(document=file_bytes, file_name=filename, page_num=1)
     else:
         return "File type not allowed."
 
-    predictions = multipage_combine(predictions, shared_invoice)
     print(predictions)
     for file in predictions:
-        #predictions = add_webservice_user(predictions, file, user_query)
+        predictions = add_webservice_user(predictions, file, user_query)
         predictions[file]['process_id'] = process_id 
         predictions[file]['merged_file_path'] = os.path.abspath(data_folder+"SPLIT/"+file)
         payload = {
@@ -183,7 +185,6 @@ def extract_compare(file_bytes, filename, user_id, process_id):
         #r = requests.post(url, auth=('admin', r'u\}M[6zzAU@w8YLx'), headers={'Content-Type': 'application/json'}, data=json.dumps(payload))
         #print(r.status_code)
     #push_parsed_inv(json.dumps(predictions), process_id, user_id)
-
         y = json.dumps(payload, indent=4)
         with open(data_folder+'PREDICTIONS/'+file_name(file)+'.json', 'w') as outfile:
             outfile.write(y)
