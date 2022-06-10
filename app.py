@@ -2,7 +2,6 @@ from flask import Flask, jsonify, request
 import shutil, requests, json
 
 from extract import extract_compare
-#from functions import invoice_pages_cosco, split_pdf, classify_carriers
 import os
 from datetime import datetime
 
@@ -40,9 +39,9 @@ def compare():
             filename = file_url.rsplit('/', 1)[1]
             return extract_compare(response.content, filename, user_id, process_id)
         else:
-            file_obj = request.files.getlist('file')[0]
-            if file_obj.filename != '':
-                return extract_compare(file_obj.read(), file_obj.filename, user_id, process_id)
+            file_obj = request.files.getlist('file')#[0]
+            if file_obj[0].filename != '':
+                return extract_compare(file_obj, user_id, process_id)
             else:
                 return "No file submitted."
 
