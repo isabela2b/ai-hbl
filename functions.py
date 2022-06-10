@@ -11,6 +11,7 @@ from pdf2image import convert_from_path
 from PIL import Image
 
 hbl_page_model = keras.models.load_model('models/hbl_page.h5')
+classify_model = keras.models.load_model('models/reg_classifier.h5')
 ALLOWED_EXTENSIONS = set(['pdf', 'png', 'jpg', 'jpeg', 'bmp', 'docx', 'xlsx', 'xls','tiff'])
 
 #poppler_path = r"C:\Program Files\poppler-21.03.0\Library\bin"
@@ -39,3 +40,7 @@ def hbl_page(image):
     image = img_preprocess(image, 224)
     pred=hbl_page_model.predict(image)
     return round(pred[0][0])
+
+def classify_page(image): #to make it easier i can just add if else, jesus!
+    image = img_preprocess(image, 224)
+    return np.argmax(classify_model.predict(image))
