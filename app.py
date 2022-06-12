@@ -1,9 +1,10 @@
 from flask import Flask, jsonify, request
-import shutil, requests, json
+import shutil, json
 
 from extract import extract_compare
 import os
 from datetime import datetime
+from ast import literal_eval
 
 """import logging
 from logging.handlers import RotatingFileHandler"""
@@ -34,14 +35,12 @@ def compare():
         process_id = request.form['process_id']
 
         if "file" in request.form:
-            file_url = request.form['file']
-            response = requests.get(file_url)
-            filename = file_url.rsplit('/', 1)[1]
-            return extract_compare(response.content, filename, user_id, process_id)
+            file_urls = request.form['file']
+            return extract_compare(literal_eval(file_urls), user_id, process_id)
         else:
-            file_obj = request.files.getlist('file')#[0]
+            file_obj = request.files.getlist('file')
             if file_obj[0].filename != '':
-                return extract_compare(file_obj, user_id, process_id)
+                return extract_compare(file_obj, user_id, process_id, url=False)
             else:
                 return "No file submitted."
 

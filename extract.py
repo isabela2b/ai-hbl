@@ -171,90 +171,75 @@ def data_load():
         data = json.load(f)
     return data
 
-def predict(files, user_id, process_id):
-    predictions = {}
-    shared_invoice = {} #page and invoice number
-    user_query = query_webservice_user(user_id)
+def predict(predictions, shared_invoice, file_bytes, filename):
+    ext = file_ext(filename)
 
-    payload = {}
-    hbl_list = []
-    for file in predictions:
-        predictions = add_webservice_user(predictions, file, user_query)
-        predictions[file]['process_id'] = process_id
-        if predictions[file]['doc_type'] == "MBL":
-            predictions[file]["table"] = data_load()
-            payload["MBL"] = predictions[file]#json.dumps(predictions[file])
-        else:
-            hbl_list.append(predictions[file])
-        #payload = {json.dumps(predictions[file])}
-        y = json.dumps(predictions[file], indent=4)
-        with open(data_folder+'PREDICTIONS/'+file_name(file)+'.json', 'w') as outfile:
-            outfile.write(y)
-    if hbl_list: 
-        payload["HBL"] = hbl_list
-    #push_parsed_inv(json.dumps(payload), process_id, user_id)
-    return payload
-
-def extract_compare(files, user_id, process_id):
-    predictions = {}
-    shared_invoice = {} #page and invoice number
-    user_query = query_webservice_user(user_id)
-    for file_obj in files:
-        filename = file_obj.filename
-        ext = file_ext(filename)
-        file_bytes = file_obj.read()
-
-        if ext == "pdf":
-            images = convert_from_bytes(file_bytes, grayscale=True, fmt="jpeg") #, poppler_path=poppler_path
-            inputpdf = PdfFileReader(io.BytesIO(file_bytes))
-            if inputpdf.isEncrypted:
-                try:
-                    inputpdf.decrypt('')
-                    print('File Decrypted (PyPDF2)')
-                except:
-                    print("Decryption error")
-            #classify and split
-            for page, image in enumerate(images):
-                pred = classify_page(image)
-                if pred == class_indices['hbl']:
-                    #if hbl_page(image) == 1:
-                    output = PdfFileWriter()
-                    output.addPage(inputpdf.getPage(page)) #pages begin at zero in pdffilewriter
-                    page_num = page+1 #for counters to begin at 1
-                    split_file_name = file_name(filename) +"_pg"+str(page_num)+".pdf"
-                    split_file_path = data_folder+"SPLIT/"+split_file_name
-                    with open(split_file_path, "wb") as outputStream:
-                        output.write(outputStream) #this can be moved to only save when the split file is AP
-                    fd = open(split_file_path, "rb")
-                    predictions[split_file_name] = form_recognizer_one(document=fd.read(), file_name=filename, page_num=page_num)
-                    predictions[split_file_name]['release_type'] = find_release_type(predictions[split_file_name]['surrendered'],predictions[split_file_name]['telex_release'], predictions[split_file_name]['ebl'], predictions[split_file_name]['number_original'])
-                    shared_invoice[split_file_name] = predictions[split_file_name]['hbl_number']
-                    predictions[split_file_name]['doc_type'] = "HBL"
-                elif pred == class_indices['mbl']:
-                    output = PdfFileWriter()
-                    output.addPage(inputpdf.getPage(page)) #pages begin at zero in pdffilewriter
-                    page_num = page+1 #for counters to begin at 1
-                    split_file_name = file_name(filename) +"_pg"+str(page_num)+".pdf"
-                    split_file_path = data_folder+"SPLIT/"+split_file_name
-                    with open(split_file_path, "wb") as outputStream:
-                        output.write(outputStream) #this can be moved to only save when the split file is AP
-                    fd = open(split_file_path, "rb")
-                    predictions[split_file_name] = form_recognizer_one(document=fd.read(), file_name=filename, page_num=page_num, model_id="mbl_cosco_1")
-                    predictions[split_file_name]['mbl_number'] = mbl_filter(predictions[split_file_name]['mbl_number'])
-                    shared_invoice[split_file_name] = predictions[split_file_name]['mbl_number']
-                    predictions[split_file_name]['doc_type'] = "MBL"
-
-            print(predictions)
-
-        elif ext in ["jpg", "jpeg", "png",'.bmp','.tiff']:
-            pil_image = Image.open(io.BytesIO(file_bytes)).convert('L').convert('RGB') 
-            if hbl_page(pil_image) == 1:
-                predictions[filename] = form_recognizer_one(document=file_bytes, file_name=filename, page_num=1, model_id="hbl_portever1")
-                shared_invoice[filename] = predictions[filename]['hbl_number']
-                predictions[filename]['doc_type'] = "HBL"
+    if ext == "pdf":
+        images = convert_from_bytes(file_bytes, grayscale=True, fmt="jpeg") #, poppler_path=poppler_path
+        inputpdf = PdfFileReader(io.BytesIO(file_bytes))
+        if inputpdf.isEncrypted:
+            try:
+                inputpdf.decrypt('')
+                print('File Decrypted (PyPDF2)')
+            except:
+                print("Decryption error")
+        
+        #classify and split
+        for page, image in enumerate(images):
+            pred = classify_page(image)
+            if pred == class_indices['hbl']:
+                #if hbl_page(image) == 1:
+                output = PdfFileWriter()
+                output.addPage(inputpdf.getPage(page)) #pages begin at zero in pdffilewriter
+                page_num = page+1 #for counters to begin at 1
+                split_file_name = file_name(filename) +"_pg"+str(page_num)+".pdf"
+                split_file_path = data_folder+"SPLIT/"+split_file_name
+                with open(split_file_path, "wb") as outputStream:
+                    output.write(outputStream) #this can be moved to only save when the split file is AP
+                fd = open(split_file_path, "rb")
+                predictions[split_file_name] = form_recognizer_one(document=fd.read(), file_name=filename, page_num=page_num)
+                predictions[split_file_name]['release_type'] = find_release_type(predictions[split_file_name]['surrendered'],predictions[split_file_name]['telex_release'], predictions[split_file_name]['ebl'], predictions[split_file_name]['number_original'])
+                shared_invoice[split_file_name] = predictions[split_file_name]['hbl_number']
+                predictions[split_file_name]['doc_type'] = "HBL"
+            elif pred == class_indices['mbl']:
+                output = PdfFileWriter()
+                output.addPage(inputpdf.getPage(page)) #pages begin at zero in pdffilewriter
+                page_num = page+1 #for counters to begin at 1
+                split_file_name = file_name(filename) +"_pg"+str(page_num)+".pdf"
+                split_file_path = data_folder+"SPLIT/"+split_file_name
+                with open(split_file_path, "wb") as outputStream:
+                    output.write(outputStream) #this can be moved to only save when the split file is AP
+                fd = open(split_file_path, "rb")
+                predictions[split_file_name] = form_recognizer_one(document=fd.read(), file_name=filename, page_num=page_num, model_id="mbl_cosco_1")
+                predictions[split_file_name]['mbl_number'] = mbl_filter(predictions[split_file_name]['mbl_number'])
+                shared_invoice[split_file_name] = predictions[split_file_name]['mbl_number']
+                predictions[split_file_name]['doc_type'] = "MBL"
                 print(predictions)
-        else:
-            return "File type not allowed."
+
+    elif ext in ["jpg", "jpeg", "png",'.bmp','.tiff']:
+        pil_image = Image.open(io.BytesIO(file_bytes)).convert('L').convert('RGB') 
+        if hbl_page(pil_image) == 1:
+            predictions[filename] = form_recognizer_one(document=file_bytes, file_name=filename, page_num=1, model_id="hbl_portever1")
+            shared_invoice[filename] = predictions[filename]['hbl_number']
+            predictions[filename]['doc_type'] = "HBL"
+    else:
+        return "File type not allowed."
+
+    return predictions, shared_invoice
+
+def extract_compare(files, user_id, process_id, url=True):
+    predictions = {}
+    shared_invoice = {} 
+    user_query = query_webservice_user(user_id)
+
+    if url: #you can reduce this step by adding it to app.py instead
+        for f in files:
+            response = requests.get(f)
+            filename = f.rsplit('/', 1)[1]
+            predictions, shared_invoice = predict(predictions, shared_invoice, response.content, filename)
+    else:
+        for f in files:
+            predictions, shared_invoice = predict(predictions, shared_invoice, f.read(), f.filename)
 
     payload = {}
     hbl_list = []
