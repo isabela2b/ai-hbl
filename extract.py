@@ -6,6 +6,7 @@ from pymssql import _mssql
 from pdf2image import convert_from_bytes
 from PyPDF2 import PdfFileMerger
 from PIL import Image
+from collections import defaultdict
 
 from functions import * 
 
@@ -43,24 +44,39 @@ def package_count_filter(container_type):
 
 def mbl_filter(mbl_number):
     new_mbl = re.findall("[a-zA-Z]{4}[0-9]{10}", special_char_filter(mbl_number))
-    return new_mbl[0]
+    return new_mbl[0]git 
 
 def find_release_type(surrendered, telex_release, ebl, number_original):
     release_type = "OBR"
-    print(number_original.lower())
-    if surrendered or telex_release or ebl or number_original.lower() in ["one", "zero", "1", "0", "none"]:
+    if surrendered or telex_release or ebl or any(map(number_original.lower().__contains__, ["one", "zero", "1", "0", "none"])):
         release_type = "EBL"
     return release_type
-    
+
 def container_type_filter(container_type):
+    return re.findall("[0-9]{2}[a-zA-Z]{2}", container_type)[0]
+    
+def separate_package(container_type):
     package_number = re.sub("[0-9]{2}[a-zA-Z]{2}", '', container_type)
     new_container_type = container_type.replace(package_number, '')
     return new_container_type, special_char_filter(package_number)
 
+def table_row_filter(table):
+    formatted_table = {'container_number': [], 'seal': [], 'container_type':[], 'chargeable_weight':[], 'volume': [], 'package_count': []}
+    for row in table['row']:
+        row = row.split('/')
+        formatted_table['container_number'].append(container_separate(row[0])[0])
+        formatted_table['seal'].append(special_char_filter(row[1]))
+        formatted_table['container_type'].append(special_char_filter(row[2]))
+        formatted_table['package_count'].append(row[3])
+        formatted_table['chargeable_weight'].append(row[4])
+        formatted_table['volume'].append(row[5])
+    return formatted_table
+
 def form_recognizer_one(document, file_name, page_num, model_id=default_model_id):
     prediction={}
+    table = defaultdict(list)
 
-    table = {'container_number': [], 'seal': [], 'container_type':[], 'chargeable_weight':[], 'volume': [], 'package_count': []}
+    #table = {'container_number': [], 'seal': [], 'container_type':[], 'chargeable_weight':[], 'volume': [], 'package_count': []}
     poller = document_analysis_client.begin_analyze_document(model=model_id, document=document)
     result = poller.result()
 
@@ -76,6 +92,8 @@ def form_recognizer_one(document, file_name, page_num, model_id=default_model_id
                         print('Field {} has value {}'.format(key, item.value))
                         if key == "seal" and item.value:
                             table[key].append(special_char_filter(item.value))
+                        elif key == "container_type" and item.value:
+                            table[key].append(container_type_filter(item.value))
                         else:
                             table[key].append(item.value)
             else:
@@ -84,19 +102,6 @@ def form_recognizer_one(document, file_name, page_num, model_id=default_model_id
 
     if prediction['container_number'] is not None:
         prediction['container_number'] = container_separate(prediction['container_number'])
-    
-    if table['seal'][0] is None and table['container_number'][0]:
-        for idx, item in enumerate(table['container_number']):
-            new_container = container_separate(item)[0]
-            table['container_number'][idx] = new_container
-            table['seal'][idx] = special_char_filter(item.replace(new_container, ""))
-    elif table['container_number'][0] :
-        for idx, item in enumerate(table['container_number']):
-            table['container_number'][idx] = container_separate(item)[0]
-
-    if table['package_count'][0] is None:
-        for idx, item in enumerate(table['container_type']): 
-            table['container_type'][idx], table['package_count'][idx] = container_type_filter(item)
 
     prediction['table'] = table
     prediction['filename'] = file_name
@@ -166,11 +171,6 @@ def push_parsed_inv(predictions, process_id, user_id):
     cursor.execute("UPDATE [dbo].[match_registration] SET [parsed_input]=%s WHERE [process_id]=%s AND [user_id]=%s", (predictions, process_id, user_id))
     conn.commit()
 
-def data_load():
-    with open('table.json', 'r') as f:
-        data = json.load(f)
-    return data
-
 def predict(predictions, shared_invoice, file_bytes, filename):
     ext = file_ext(filename)
 
@@ -197,10 +197,11 @@ def predict(predictions, shared_invoice, file_bytes, filename):
                 with open(split_file_path, "wb") as outputStream:
                     output.write(outputStream) #this can be moved to only save when the split file is AP
                 fd = open(split_file_path, "rb")
-                predictions[split_file_name] = form_recognizer_one(document=fd.read(), file_name=filename, page_num=page_num)
+                predictions[split_file_name] = form_recognizer_one(document=fd.read(), file_name=filename, page_num=page_num, model_id="hbl_hls_1")
                 predictions[split_file_name]['release_type'] = find_release_type(predictions[split_file_name]['surrendered'],predictions[split_file_name]['telex_release'], predictions[split_file_name]['ebl'], predictions[split_file_name]['number_original'])
                 shared_invoice[split_file_name] = predictions[split_file_name]['hbl_number']
                 predictions[split_file_name]['doc_type'] = "HBL"
+                predictions[split_file_name]['table'] = table_row_filter(predictions[split_file_name]['table'])
             elif pred == class_indices['mbl']:
                 output = PdfFileWriter()
                 output.addPage(inputpdf.getPage(page)) #pages begin at zero in pdffilewriter
@@ -210,7 +211,7 @@ def predict(predictions, shared_invoice, file_bytes, filename):
                 with open(split_file_path, "wb") as outputStream:
                     output.write(outputStream) #this can be moved to only save when the split file is AP
                 fd = open(split_file_path, "rb")
-                predictions[split_file_name] = form_recognizer_one(document=fd.read(), file_name=filename, page_num=page_num, model_id="mbl_cosco_1")
+                predictions[split_file_name] = form_recognizer_one(document=fd.read(), file_name=filename, page_num=page_num, model_id="mbl_cosco_8")
                 predictions[split_file_name]['mbl_number'] = mbl_filter(predictions[split_file_name]['mbl_number'])
                 shared_invoice[split_file_name] = predictions[split_file_name]['mbl_number']
                 predictions[split_file_name]['doc_type'] = "MBL"
@@ -249,7 +250,6 @@ def extract_compare(files, user_id, process_id, url=True):
         predictions = add_webservice_user(predictions, file, user_query)
         predictions[file]['process_id'] = process_id
         if predictions[file]['doc_type'] == "MBL":
-            predictions[file]["table"] = data_load()
             payload["MBL"] = predictions[file]#json.dumps(predictions[file])
         else:
             hbl_list.append(predictions[file])
