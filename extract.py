@@ -1,4 +1,4 @@
-import os, shutil, json, glob, re, requests, io, cv2 #keras
+import os, shutil, json, glob, re, io, cv2 #keras
 import pandas as pd
 import numpy as np
 import pymssql
@@ -42,9 +42,9 @@ def special_char_filter(filename):
 def package_count_filter(container_type):
     return package_count
 
-def mbl_filter(mbl_number):
+def mbl_filter(mbl_number): #fix mbl filter, remove everything before the special character
     new_mbl = re.findall("[a-zA-Z]{4}[0-9]{10}", special_char_filter(mbl_number))
-    return new_mbl[0]git 
+    return new_mbl[0]
 
 def find_release_type(surrendered, telex_release, ebl, number_original):
     release_type = "OBR"
@@ -171,7 +171,13 @@ def push_parsed_inv(predictions, process_id, user_id):
     cursor.execute("UPDATE [dbo].[match_registration] SET [parsed_input]=%s WHERE [process_id]=%s AND [user_id]=%s", (predictions, process_id, user_id))
     conn.commit()
 
-def predict(predictions, shared_invoice, file_bytes, filename):
+def predict(file_bytes, filename, process_id, user_id):
+    predictions = {}
+    shared_invoice = {}
+    payload = {}
+    hbl_list = []
+
+    user_query = query_webservice_user(user_id)
     ext = file_ext(filename)
 
     if ext == "pdf":
@@ -197,8 +203,7 @@ def predict(predictions, shared_invoice, file_bytes, filename):
                 with open(split_file_path, "wb") as outputStream:
                     output.write(outputStream) #this can be moved to only save when the split file is AP
                 fd = open(split_file_path, "rb")
-                predictions[split_file_name] = form_recognizer_one(document=fd.read(), file_name=filename, page_num=page_num, model_id="hbl_hls_1")
-                predictions[split_file_name]['release_type'] = find_release_type(predictions[split_file_name]['surrendered'],predictions[split_file_name]['telex_release'], predictions[split_file_name]['ebl'], predictions[split_file_name]['number_original'])
+                predictions[split_file_name] = form_recognizer_one(document=fd.read(), file_name=filename, page_num=page_num, model_id="hbl_hls_2")
                 shared_invoice[split_file_name] = predictions[split_file_name]['hbl_number']
                 predictions[split_file_name]['doc_type'] = "HBL"
                 predictions[split_file_name]['table'] = table_row_filter(predictions[split_file_name]['table'])
@@ -217,48 +222,32 @@ def predict(predictions, shared_invoice, file_bytes, filename):
                 predictions[split_file_name]['doc_type'] = "MBL"
                 print(predictions)
 
+        predictions = multipage_combine(predictions, shared_invoice)
+
     elif ext in ["jpg", "jpeg", "png",'.bmp','.tiff']:
         pil_image = Image.open(io.BytesIO(file_bytes)).convert('L').convert('RGB') 
         if hbl_page(pil_image) == 1:
             predictions[filename] = form_recognizer_one(document=file_bytes, file_name=filename, page_num=1, model_id="hbl_portever1")
-            shared_invoice[filename] = predictions[filename]['hbl_number']
             predictions[filename]['doc_type'] = "HBL"
     else:
         return "File type not allowed."
 
-    return predictions, shared_invoice
-
-def extract_compare(files, user_id, process_id, url=True):
-    predictions = {}
-    shared_invoice = {} 
-    user_query = query_webservice_user(user_id)
-
-    if url: #you can reduce this step by adding it to app.py instead
-        for f in files:
-            response = requests.get(f)
-            filename = f.rsplit('/', 1)[1]
-            predictions, shared_invoice = predict(predictions, shared_invoice, response.content, filename)
-    else:
-        for f in files:
-            predictions, shared_invoice = predict(predictions, shared_invoice, f.read(), f.filename)
-
-    payload = {}
-    hbl_list = []
-    predictions = multipage_combine(predictions, shared_invoice)
     for file in predictions:
-        print(file)
         predictions = add_webservice_user(predictions, file, user_query)
         predictions[file]['process_id'] = process_id
         if predictions[file]['doc_type'] == "MBL":
             payload["MBL"] = predictions[file]#json.dumps(predictions[file])
         else:
+            predictions[file]['release_type'] = find_release_type(predictions[file]['surrendered'],predictions[file]['telex_release'], predictions[file]['ebl'], predictions[file]['number_original'])
             hbl_list.append(predictions[file])
-        #payload = {json.dumps(predictions[file])}
+
         y = json.dumps(predictions[file], indent=4)
         with open(data_folder+'PREDICTIONS/'+file_name(file)+'.json', 'w') as outfile:
             outfile.write(y)
+
     if hbl_list: 
         payload["HBL"] = hbl_list
+
     #push_parsed_inv(json.dumps(payload), process_id, user_id)
 
     return payload

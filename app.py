@@ -1,7 +1,7 @@
 from flask import Flask, jsonify, request
-import shutil, json
+import shutil, json, requests
 
-from extract import extract_compare
+from extract import predict
 import os
 from datetime import datetime
 from ast import literal_eval
@@ -32,15 +32,22 @@ def compare():
     if (params != None):
         #try:
         user_id = request.form['user_id']
-        process_id = request.form['process_id']
+        process_id = literal_eval(request.form['process_id'])
 
         if "file" in request.form:
-            file_urls = request.form['file']
-            return extract_compare(literal_eval(file_urls), user_id, process_id)
+            file_urls = literal_eval(request.form['file'])
+            #return extract_compare((file_urls), user_id, process_id)
+            for idx, url in enumerate(file_urls):
+                response = requests.get(url)
+                filename = url.rsplit('/', 1)[1]
+                predictions = predict(response.content, filename, process_id[idx], user_id)
+            return predictions
         else:
             file_obj = request.files.getlist('file')
             if file_obj[0].filename != '':
-                return extract_compare(file_obj, user_id, process_id, url=False)
+                for idx, obj in enumerate(file_obj):
+                    predictions = predict(obj.read(), obj.filename, process_id[idx], user_id)
+                return predictions
             else:
                 return "No file submitted."
 
