@@ -23,6 +23,8 @@ data_folder = "../ai-data/test-ftp-folder/"
 #poppler_path = r"C:\Program Files\poppler-21.03.0\Library\bin"
 
 class_indices = {'hbl': 0, 'mbl': 1, 'others': 2}
+#mbl_carriers_indices = {0: 'anl', 1: 'anl-2', 2: 'carotrans', 3: 'cmacgm', 4: 'cmacgm-2', 5: 'cosco', 6: 'cosco-2', 7: 'direct', 8: 'evergreen', 9:'evergreen-2', 10: 'goldstar', 11: 'goldstar-2', 12: 'hamsud', 13: 'hapllo', 14: 'happlo-2', 15: 'hmm', 16: 'hmm-2', 17: 'maersk', 18: 'maersk-2', 19: 'mariana', 20: 'msc', 21: 'msc-2', 22: 'ocenet', 23: 'ocenet-2', 24: 'oocl', 25: 'oocl-2', 26: 'other', 27: 'pil', 28: 'sinotrans', 29: 'tslines', 30: 'tslines-2', 31: 'yangming'}
+mbl_carriers_match = {0: 'anl', 1: 'anl-2', 2: 'carotrans', 3: 'cmacgm', 4: 'cmacgm-2', 5:'mbl_cosco_12', 6:'mbl_attached_4', 7: 'direct', 8: 'evergreen', 9:'evergreen-2', 10: 'goldstar', 11: 'goldstar-2', 12: 'hamsud', 13: 'hapllo', 14: 'happlo-2', 15: 'hmm', 16: 'hmm-2', 17: 'maersk', 18: 'maersk-2', 19: 'mariana', 20: 'msc', 21: 'msc-2', 22: 'ocenet', 23: 'ocenet-2', 24: 'oocl', 25: 'oocl-2', 26: 'other', 27: 'pil', 28: 'sinotrans', 29: 'tslines', 30: 'tslines-2', 31: 'yangming'}
 
 def container_separate(containers):
     """
@@ -42,9 +44,21 @@ def special_char_filter(filename):
 def package_count_filter(container_type):
     return package_count
 
-def mbl_filter(mbl_number): #fix mbl filter, remove everything before the special character
+def mbl_num_filter(mbl_number): #fix mbl filter, remove everything before the special character
     new_mbl = re.findall("[a-zA-Z]{4}[0-9]{10}", special_char_filter(mbl_number))
     return new_mbl[0]
+
+def mbl_filter(prediction):
+    prediction['mbl_number'] = mbl_num_filter(prediction['mbl_number'])
+    prediction['doc_type'] = "MBL"
+
+    if prediction.__contains__('vessel_voyage'):
+        for substring in prediction['vessel_voyage'].split(" "):
+            if re.search(r'\d', substring):
+                prediction['voyage_number'] = substring
+        prediction['vessel_name'] = prediction['vessel_voyage'].replace(prediction['voyage_number'], "").strip()
+
+    return prediction
 
 def find_release_type(surrendered, telex_release, ebl, number_original):
     release_type = "OBR"
@@ -100,7 +114,7 @@ def form_recognizer_one(document, file_name, page_num, model_id=default_model_id
                 prediction[name]=field.value
                 print("Field '{}' has value '{}' with confidence of {}".format(name, field.value, field.confidence))
 
-    if prediction['container_number'] is not None:
+    if prediction.__contains__('container_number') and prediction['container_number'] is not None:
         prediction['container_number'] = container_separate(prediction['container_number'])
 
     prediction['table'] = table
@@ -171,6 +185,9 @@ def push_parsed_inv(predictions, process_id, user_id):
     cursor.execute("UPDATE [dbo].[match_registration] SET [parsed_input]=%s WHERE [process_id]=%s AND [user_id]=%s", (predictions, process_id, user_id))
     conn.commit()
 
+def mbl_carrier_model(image):
+    return mbl_carriers_match[classify_mbl_carrier(image)]
+
 def predict(file_bytes, filename, process_id, user_id):
     predictions = {}
     shared_invoice = {}
@@ -182,7 +199,7 @@ def predict(file_bytes, filename, process_id, user_id):
 
     if ext == "pdf":
         images = convert_from_bytes(file_bytes, grayscale=True, fmt="jpeg") #, poppler_path=poppler_path
-        inputpdf = PdfFileReader(io.BytesIO(file_bytes))
+        inputpdf = PdfFileReader(io.BytesIO(file_bytes), strict=False)
         if inputpdf.isEncrypted:
             try:
                 inputpdf.decrypt('')
@@ -216,10 +233,9 @@ def predict(file_bytes, filename, process_id, user_id):
                 with open(split_file_path, "wb") as outputStream:
                     output.write(outputStream) #this can be moved to only save when the split file is AP
                 fd = open(split_file_path, "rb")
-                predictions[split_file_name] = form_recognizer_one(document=fd.read(), file_name=filename, page_num=page_num, model_id="mbl_cosco_8")
-                predictions[split_file_name]['mbl_number'] = mbl_filter(predictions[split_file_name]['mbl_number'])
+                predictions[split_file_name] = form_recognizer_one(document=fd.read(), file_name=filename, page_num=page_num, model_id=mbl_carrier_model(image))
+                predictions[split_file_name] = mbl_filter(predictions[split_file_name])
                 shared_invoice[split_file_name] = predictions[split_file_name]['mbl_number']
-                predictions[split_file_name]['doc_type'] = "MBL"
                 print(predictions)
 
         predictions = multipage_combine(predictions, shared_invoice)
