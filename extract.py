@@ -24,7 +24,7 @@ data_folder = "../ai-data/test-ftp-folder/"
 
 class_indices = {'hbl': 0, 'mbl': 1, 'others': 2}
 #mbl_carriers_indices = {0: 'anl', 1: 'anl-2', 2: 'carotrans', 3: 'cmacgm', 4: 'cmacgm-2', 5: 'cosco', 6: 'cosco-2', 7: 'direct', 8: 'evergreen', 9:'evergreen-2', 10: 'goldstar', 11: 'goldstar-2', 12: 'hamsud', 13: 'hapllo', 14: 'happlo-2', 15: 'hmm', 16: 'hmm-2', 17: 'maersk', 18: 'maersk-2', 19: 'mariana', 20: 'msc', 21: 'msc-2', 22: 'ocenet', 23: 'ocenet-2', 24: 'oocl', 25: 'oocl-2', 26: 'other', 27: 'pil', 28: 'sinotrans', 29: 'tslines', 30: 'tslines-2', 31: 'yangming'}
-mbl_carriers_match = {0: 'anl', 1: 'anl-2', 2: 'carotrans', 3: 'cmacgm', 4: 'cmacgm-2', 5:'mbl_cosco_12', 6:'mbl_attached_4', 7: 'direct', 8: 'evergreen', 9:'evergreen-2', 10: 'goldstar', 11: 'goldstar-2', 12: 'hamsud', 13: 'hapllo', 14: 'happlo-2', 15: 'hmm', 16: 'hmm-2', 17: 'maersk', 18: 'maersk-2', 19: 'mariana', 20: 'msc', 21: 'msc-2', 22: 'ocenet', 23: 'ocenet-2', 24: 'oocl', 25: 'oocl-2', 26: 'other', 27: 'pil', 28: 'sinotrans', 29: 'mbl_tslines_2', 30: 'tslines-2', 31: 'yangming'}
+mbl_carriers_match = {0: 'anl', 1: 'anl-2', 2: 'carotrans', 3: 'cmacgm', 4: 'cmacgm-2', 5:'mbl_cosco_13', 6:'mbl_attached_4', 7: 'direct', 8: 'evergreen', 9:'evergreen-2', 10: 'goldstar', 11: 'goldstar-2', 12: 'hamsud', 13: 'hapllo', 14: 'happlo-2', 15: 'hmm', 16: 'hmm-2', 17: 'maersk', 18: 'maersk-2', 19: 'mariana', 20: 'msc', 21: 'msc-2', 22: 'ocenet', 23: 'ocenet-2', 24: 'oocl', 25: 'oocl-2', 26: 'other', 27: 'pil', 28: 'sinotrans', 29: 'mbl_tslines_2', 30: 'tslines-2', 31: 'yangming'}
 
 def container_separate(containers):
     """
@@ -41,15 +41,11 @@ def special_char_filter(filename):
     """
     return re.sub('[^A-Za-z0-9]+', '', filename)
 
-def package_count_filter(container_type):
-    return package_count
-
 def mbl_num_filter(mbl_number): #fix mbl filter, remove everything before the special character
     new_mbl = re.findall("[a-zA-Z]{4}[0-9]{10}", special_char_filter(mbl_number))
     return new_mbl[0]
 
 def mbl_filter(prediction):
-    prediction['mbl_number'] = mbl_num_filter(prediction['mbl_number'])
     prediction['doc_type'] = "MBL"
 
     if prediction.__contains__('vessel_voyage'):
@@ -58,6 +54,15 @@ def mbl_filter(prediction):
                 prediction['voyage_number'] = substring
         prediction['vessel_name'] = prediction['vessel_voyage'].replace(prediction['voyage_number'], "").strip()
 
+    return prediction
+
+def hbl_filter(prediction):
+    prediction['doc_type'] = "HBL"
+
+    if prediction['consignee_address']:
+        for substring in prediction['consignee_address'].split(" "):
+            if re.search('[a-zA-Z]{3}', substring) and len(substring) == 3:
+                prediction['state_code'] = substring
     return prediction
 
 def find_release_type(surrendered, telex_release, ebl, number_original):
@@ -69,10 +74,14 @@ def find_release_type(surrendered, telex_release, ebl, number_original):
 def container_type_filter(container_type):
     return re.findall("[0-9]{2}[a-zA-Z]{2}", container_type)[0]
     
-def separate_package(container_type):
-    package_number = re.sub("[0-9]{2}[a-zA-Z]{2}", '', container_type)
-    new_container_type = container_type.replace(package_number, '')
-    return new_container_type, special_char_filter(package_number)
+def separate_package(table):
+    for idx,container_type in enumerate(table['container_type']):
+        table['container_type'][idx] = re.findall("[0-9]{2}[a-zA-Z]{2}",container_type)[0]
+        remaining = container_type.replace(table['container_type'][idx], '').split(';')
+        if len(remaining)>2:
+            table['chargeable_weight'][idx] = special_char_filter(remaining[0])
+            table['volume'][idx] = special_char_filter(remaining[1])
+    return table
 
 def table_row_filter(table):
     formatted_table = {'container_number': [], 'seal': [], 'container_type':[], 'chargeable_weight':[], 'volume': [], 'package_count': []}
@@ -106,8 +115,6 @@ def form_recognizer_one(document, file_name, page_num, model_id=default_model_id
                         print('Field {} has value {}'.format(key, item.value))
                         if key == "seal" and item.value:
                             table[key].append(special_char_filter(item.value))
-                        elif key == "container_type" and item.value:
-                            table[key].append(container_type_filter(item.value))
                         else:
                             table[key].append(item.value)
             else:
@@ -117,7 +124,10 @@ def form_recognizer_one(document, file_name, page_num, model_id=default_model_id
     if prediction.__contains__('container_number') and prediction['container_number'] is not None:
         prediction['container_number'] = container_separate(prediction['container_number'])
 
-    prediction['table'] = table
+    try:
+        prediction['table'] = separate_package(table)
+    except:
+        prediction['table'] = table
     prediction['filename'] = file_name
     prediction['page'] = page_num
 
@@ -220,9 +230,9 @@ def predict(file_bytes, filename, process_id, user_id):
                 with open(split_file_path, "wb") as outputStream:
                     output.write(outputStream) #this can be moved to only save when the split file is AP
                 fd = open(split_file_path, "rb")
-                predictions[split_file_name] = form_recognizer_one(document=fd.read(), file_name=filename, page_num=page_num, model_id="hbl_hls_3")
+                predictions[split_file_name] = form_recognizer_one(document=fd.read(), file_name=filename, page_num=page_num, model_id="hbl_hls_4")
+                predictions[split_file_name] = hbl_filter(predictions[split_file_name])
                 shared_invoice[split_file_name] = predictions[split_file_name]['hbl_number']
-                predictions[split_file_name]['doc_type'] = "HBL"
                 predictions[split_file_name]['table'] = table_row_filter(predictions[split_file_name]['table'])
             elif pred == class_indices['mbl']:
                 output = PdfFileWriter()
@@ -233,7 +243,12 @@ def predict(file_bytes, filename, process_id, user_id):
                 with open(split_file_path, "wb") as outputStream:
                     output.write(outputStream) #this can be moved to only save when the split file is AP
                 fd = open(split_file_path, "rb")
-                predictions[split_file_name] = form_recognizer_one(document=fd.read(), file_name=filename, page_num=page_num, model_id=mbl_carrier_model(image))
+                carrier = classify_mbl_carrier(image)
+                predictions[split_file_name] = form_recognizer_one(document=fd.read(), file_name=filename, page_num=page_num, model_id=mbl_carriers_match[carrier])
+                
+                if carrier == 6: #attached cosco
+                    predictions[split_file_name]['mbl_number'] = mbl_num_filter(predictions[split_file_name]['mbl_number'])
+                
                 predictions[split_file_name] = mbl_filter(predictions[split_file_name])
                 shared_invoice[split_file_name] = predictions[split_file_name]['mbl_number']
                 print(predictions)
