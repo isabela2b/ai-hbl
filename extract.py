@@ -63,6 +63,7 @@ def hbl_filter(prediction):
         for substring in prediction['consignee_address'].split(" "):
             if re.search('[a-zA-Z]{3}', substring) and len(substring) == 3:
                 prediction['state_code'] = substring
+                break
     return prediction
 
 def find_release_type(surrendered, telex_release, ebl, number_original):
@@ -94,6 +95,13 @@ def table_row_filter(table):
         formatted_table['chargeable_weight'].append(row[4])
         formatted_table['volume'].append(row[5])
     return formatted_table
+
+def table_remove_null(table):
+    indexes = sorted([i for i,x in enumerate(table['container_number']) if x is None], reverse=True)
+    for col in table:
+        for index in indexes:
+            del table[col][index]
+    return table
 
 def form_recognizer_one(document, file_name, page_num, model_id=default_model_id):
     prediction={}
@@ -234,6 +242,7 @@ def predict(file_bytes, filename, process_id, user_id):
                 predictions[split_file_name] = hbl_filter(predictions[split_file_name])
                 shared_invoice[split_file_name] = predictions[split_file_name]['hbl_number']
                 predictions[split_file_name]['table'] = table_row_filter(predictions[split_file_name]['table'])
+                predictions[split_file_name]['table'] = table_remove_null(predictions[split_file_name]['table'])
             elif pred == class_indices['mbl']:
                 output = PdfFileWriter()
                 output.addPage(inputpdf.getPage(page)) #pages begin at zero in pdffilewriter
@@ -250,6 +259,7 @@ def predict(file_bytes, filename, process_id, user_id):
                     predictions[split_file_name]['mbl_number'] = mbl_num_filter(predictions[split_file_name]['mbl_number'])
                 
                 predictions[split_file_name] = mbl_filter(predictions[split_file_name])
+                predictions[split_file_name]['table'] = table_remove_null(predictions[split_file_name]['table'])
                 shared_invoice[split_file_name] = predictions[split_file_name]['mbl_number']
                 print(predictions)
 
