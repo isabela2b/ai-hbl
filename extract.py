@@ -24,7 +24,7 @@ data_folder = "../ai-data/test-ftp-folder/"
 
 class_indices = {'hbl': 0, 'mbl': 1, 'others': 2}
 #mbl_carriers_indices = {0: 'anl', 1: 'anl-2', 2: 'carotrans', 3: 'cmacgm', 4: 'cmacgm-2', 5: 'cosco', 6: 'cosco-2', 7: 'direct', 8: 'evergreen', 9:'evergreen-2', 10: 'goldstar', 11: 'goldstar-2', 12: 'hamsud', 13: 'hapllo', 14: 'happlo-2', 15: 'hmm', 16: 'hmm-2', 17: 'maersk', 18: 'maersk-2', 19: 'mariana', 20: 'msc', 21: 'msc-2', 22: 'ocenet', 23: 'ocenet-2', 24: 'oocl', 25: 'oocl-2', 26: 'other', 27: 'pil', 28: 'sinotrans', 29: 'tslines', 30: 'tslines-2', 31: 'yangming'}
-mbl_carriers_match = {0: 'anl', 1: 'anl-2', 2: 'carotrans', 3: 'cmacgm', 4: 'cmacgm-2', 5:'mbl_cosco_14', 6:'mbl_attached_4', 7: 'direct', 8: 'mbl_evergreen_2', 9:'evergreen-2', 10: 'goldstar', 11: 'goldstar-2', 12: 'hamsud', 13: 'hapllo', 14: 'happlo-2', 15: 'mbl_hmm_1', 16: 'hmm-2', 17: 'maersk', 18: 'maersk-2', 19: 'mariana', 20: 'msc', 21: 'msc-2', 22: 'ocenet', 23: 'ocenet-2', 24: 'oocl', 25: 'oocl-2', 26: 'other', 27: 'pil', 28: 'sinotrans', 29: 'mbl_tslines_2', 30: 'tslines-2', 31: 'yangming'}
+mbl_carriers_match = {0: 'anl', 1: 'anl-2', 2: 'carotrans', 3: 'cmacgm', 4: 'cmacgm-2', 5:'mbl_cosco_16', 6:'mbl_attached_4', 7: 'direct', 8: 'mbl_evergreen_2', 9:'evergreen-2', 10: 'goldstar', 11: 'goldstar-2', 12: 'hamsud', 13: 'hapllo', 14: 'happlo-2', 15: 'mbl_hmm_1', 16: 'hmm-2', 17: 'maersk', 18: 'maersk-2', 19: 'mariana', 20: 'msc', 21: 'msc-2', 22: 'ocenet', 23: 'ocenet-2', 24: 'oocl', 25: 'oocl-2', 26: 'other', 27: 'pil', 28: 'sinotrans', 29: 'mbl_tslines_2', 30: 'tslines-2', 31: 'yangming'}
 
 def container_separate(containers):
     """
@@ -138,8 +138,6 @@ def form_recognizer_one(document, file_name, page_num, model_id=default_model_id
                             table[key].append(special_char_filter(item.value))
                         else:
                             table[key].append(item.value)
-            elif name=='incoterm':
-                prediction[name]=re.sub('[^A-Za-z ]+', '', field.value)
             else:
                 prediction[name]=field.value
                 print("Field '{}' has value '{}' with confidence of {}".format(name, field.value, field.confidence))
@@ -151,6 +149,13 @@ def form_recognizer_one(document, file_name, page_num, model_id=default_model_id
         prediction['table'] = separate_package(table)
     except:
         prediction['table'] = table
+
+    if prediction.__contains__('incoterm') and prediction['incoterm']:        
+        if "freight" in prediction['incoterm'].lower():
+            prediction['incoterm'] = re.sub('[^A-Za-z ]+', '', prediction['incoterm'])
+        else:
+            prediction['incoterm'] = None
+
     prediction['filename'] = file_name
     prediction['page'] = page_num
 
