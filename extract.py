@@ -156,7 +156,7 @@ def form_recognizer_one(document, file_name, page_num, model_id=default_model_id
 
     if prediction.__contains__('consignee_address') and prediction['consignee_address']:
         for substring in prediction['consignee_address'].split(" "):
-            if re.search('[a-zA-Z]{3}', substring) and len(substring) == 3:
+            if re.search('[a-zA-Z]{3}', substring) and len(substring) == 3 and substring.upper() in ["NSW", "QLD", "VIC", "TAS", "ACT"]:
                 prediction['state_code'] = substring
                 break
 
@@ -259,7 +259,7 @@ def predict(file_bytes, filename, process_id, user_id):
                 with open(split_file_path, "wb") as outputStream:
                     output.write(outputStream) #this can be moved to only save when the split file is AP
                 fd = open(split_file_path, "rb")
-                predictions[split_file_name] = form_recognizer_one(document=fd.read(), file_name=filename, page_num=page_num, model_id="hbl_hls_5")
+                predictions[split_file_name] = form_recognizer_one(document=fd.read(), file_name=filename, page_num=page_num, model_id="hbl_hls_6")
                 predictions[split_file_name] = hbl_filter(predictions[split_file_name])
                 shared_invoice[split_file_name] = predictions[split_file_name]['hbl_number']
                 predictions[split_file_name]['table'] = table_row_filter(predictions[split_file_name]['table'])
