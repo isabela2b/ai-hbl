@@ -24,7 +24,7 @@ data_folder = "../ai-data/test-ftp-folder/"
 
 class_indices = {'hbl': 0, 'mbl': 1, 'others': 2}
 #mbl_carriers_indices = {0: 'anl', 1: 'anl-2', 2: 'carotrans', 3: 'cmacgm', 4: 'cmacgm-2', 5: 'cosco', 6: 'cosco-2', 7: 'direct', 8: 'evergreen', 9:'evergreen-2', 10: 'goldstar', 11: 'goldstar-2', 12: 'hamsud', 13: 'hapllo', 14: 'happlo-2', 15: 'hmm', 16: 'hmm-2', 17: 'maersk', 18: 'maersk-2', 19: 'mariana', 20: 'msc', 21: 'msc-2', 22: 'ocenet', 23: 'ocenet-2', 24: 'oocl', 25: 'oocl-2', 26: 'other', 27: 'pil', 28: 'sinotrans', 29: 'tslines', 30: 'tslines-2', 31: 'yangming'}
-mbl_carriers_match = {0: 'anl', 1: 'anl-2', 2: 'carotrans', 3: 'cmacgm', 4: 'cmacgm-2', 5:'mbl_cosco_13', 6:'mbl_attached_4', 7: 'direct', 8: 'evergreen', 9:'evergreen-2', 10: 'goldstar', 11: 'goldstar-2', 12: 'hamsud', 13: 'hapllo', 14: 'happlo-2', 15: 'hmm', 16: 'hmm-2', 17: 'maersk', 18: 'maersk-2', 19: 'mariana', 20: 'msc', 21: 'msc-2', 22: 'ocenet', 23: 'ocenet-2', 24: 'oocl', 25: 'oocl-2', 26: 'other', 27: 'pil', 28: 'sinotrans', 29: 'mbl_tslines_2', 30: 'tslines-2', 31: 'yangming'}
+mbl_carriers_match = {0: 'anl', 1: 'anl-2', 2: 'carotrans', 3: 'cmacgm', 4: 'cmacgm-2', 5:'mbl_cosco_14', 6:'mbl_attached_4', 7: 'direct', 8: 'evergreen', 9:'evergreen-2', 10: 'goldstar', 11: 'goldstar-2', 12: 'hamsud', 13: 'hapllo', 14: 'happlo-2', 15: 'hmm', 16: 'hmm-2', 17: 'maersk', 18: 'maersk-2', 19: 'mariana', 20: 'msc', 21: 'msc-2', 22: 'ocenet', 23: 'ocenet-2', 24: 'oocl', 25: 'oocl-2', 26: 'other', 27: 'pil', 28: 'sinotrans', 29: 'mbl_tslines_2', 30: 'tslines-2', 31: 'yangming'}
 
 def container_separate(containers):
     """
@@ -58,12 +58,6 @@ def mbl_filter(prediction):
 
 def hbl_filter(prediction):
     prediction['doc_type'] = "HBL"
-
-    if prediction['consignee_address']:
-        for substring in prediction['consignee_address'].split(" "):
-            if re.search('[a-zA-Z]{3}', substring) and len(substring) == 3:
-                prediction['state_code'] = substring
-                break
     return prediction
 
 def find_release_type(surrendered, telex_release, ebl, number_original):
@@ -87,13 +81,16 @@ def separate_package(table):
 def table_row_filter(table):
     formatted_table = {'container_number': [], 'seal': [], 'container_type':[], 'chargeable_weight':[], 'volume': [], 'package_count': []}
     for row in table['row']:
-        row = row.split('/')
-        formatted_table['container_number'].append(container_separate(row[0])[0])
-        formatted_table['seal'].append(special_char_filter(row[1]))
-        formatted_table['container_type'].append(special_char_filter(row[2]))
-        formatted_table['package_count'].append(row[3])
-        formatted_table['chargeable_weight'].append(row[4])
-        formatted_table['volume'].append(row[5])
+        try:
+            row = row.split('/')
+            formatted_table['container_number'].append(container_separate(row[0])[0])
+            formatted_table['seal'].append(special_char_filter(row[1]))
+            formatted_table['container_type'].append(special_char_filter(row[2]))
+            formatted_table['package_count'].append(row[3])
+            formatted_table['chargeable_weight'].append(row[4])
+            formatted_table['volume'].append(row[5])
+        except:
+            pass
     return formatted_table
 
 def table_remove_null(table):
@@ -138,6 +135,12 @@ def form_recognizer_one(document, file_name, page_num, model_id=default_model_id
         prediction['table'] = table
     prediction['filename'] = file_name
     prediction['page'] = page_num
+
+    if prediction.__contains__('consignee_address') and prediction['consignee_address']:
+        for substring in prediction['consignee_address'].split(" "):
+            if re.search('[a-zA-Z]{3}', substring) and len(substring) == 3:
+                prediction['state_code'] = substring
+                break
 
     return prediction
 
@@ -238,7 +241,7 @@ def predict(file_bytes, filename, process_id, user_id):
                 with open(split_file_path, "wb") as outputStream:
                     output.write(outputStream) #this can be moved to only save when the split file is AP
                 fd = open(split_file_path, "rb")
-                predictions[split_file_name] = form_recognizer_one(document=fd.read(), file_name=filename, page_num=page_num, model_id="hbl_hls_4")
+                predictions[split_file_name] = form_recognizer_one(document=fd.read(), file_name=filename, page_num=page_num, model_id="hbl_hls_5")
                 predictions[split_file_name] = hbl_filter(predictions[split_file_name])
                 shared_invoice[split_file_name] = predictions[split_file_name]['hbl_number']
                 predictions[split_file_name]['table'] = table_row_filter(predictions[split_file_name]['table'])
