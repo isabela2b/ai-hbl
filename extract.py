@@ -24,16 +24,19 @@ data_folder = "../ai-data/test-ftp-folder/"
 
 class_indices = {'hbl': 0, 'mbl': 1, 'others': 2}
 #mbl_carriers_indices = {0: 'anl', 1: 'anl-2', 2: 'carotrans', 3: 'cmacgm', 4: 'cmacgm-2', 5: 'cosco', 6: 'cosco-2', 7: 'direct', 8: 'evergreen', 9:'evergreen-2', 10: 'goldstar', 11: 'goldstar-2', 12: 'hamsud', 13: 'hapllo', 14: 'happlo-2', 15: 'hmm', 16: 'hmm-2', 17: 'maersk', 18: 'maersk-2', 19: 'mariana', 20: 'msc', 21: 'msc-2', 22: 'ocenet', 23: 'ocenet-2', 24: 'oocl', 25: 'oocl-2', 26: 'other', 27: 'pil', 28: 'sinotrans', 29: 'tslines', 30: 'tslines-2', 31: 'yangming'}
-mbl_carriers_match = {0: 'anl', 1: 'anl-2', 2: 'carotrans', 3: 'cmacgm', 4: 'cmacgm-2', 5:'mbl_cosco_14', 6:'mbl_attached_4', 7: 'direct', 8: 'evergreen', 9:'evergreen-2', 10: 'goldstar', 11: 'goldstar-2', 12: 'hamsud', 13: 'hapllo', 14: 'happlo-2', 15: 'hmm', 16: 'hmm-2', 17: 'maersk', 18: 'maersk-2', 19: 'mariana', 20: 'msc', 21: 'msc-2', 22: 'ocenet', 23: 'ocenet-2', 24: 'oocl', 25: 'oocl-2', 26: 'other', 27: 'pil', 28: 'sinotrans', 29: 'mbl_tslines_2', 30: 'tslines-2', 31: 'yangming'}
+mbl_carriers_match = {0: 'anl', 1: 'anl-2', 2: 'carotrans', 3: 'cmacgm', 4: 'cmacgm-2', 5:'mbl_cosco_14', 6:'mbl_attached_4', 7: 'direct', 8: 'mbl_evergreen_1', 9:'evergreen-2', 10: 'goldstar', 11: 'goldstar-2', 12: 'hamsud', 13: 'hapllo', 14: 'happlo-2', 15: 'hmm', 16: 'hmm-2', 17: 'maersk', 18: 'maersk-2', 19: 'mariana', 20: 'msc', 21: 'msc-2', 22: 'ocenet', 23: 'ocenet-2', 24: 'oocl', 25: 'oocl-2', 26: 'other', 27: 'pil', 28: 'sinotrans', 29: 'mbl_tslines_2', 30: 'tslines-2', 31: 'yangming'}
 
 def container_separate(containers):
     """
     This function receives a string containing all containers and outputs them into a list
     of containers following standardized formatting.
     """
-    pattern = "[a-zA-Z]{4}[0-9]{7}"
-    formatted_container = re.findall(pattern, re.sub('[^A-Za-z0-9]+','', containers))
-    return formatted_container
+    if containers:
+        pattern = "[a-zA-Z]{4}[0-9]{7}"
+        formatted_container = re.findall(pattern, re.sub('[^A-Za-z0-9]+','', containers))
+        return formatted_container
+    else:
+        return None
 
 def special_char_filter(filename):
     """
@@ -71,11 +74,12 @@ def container_type_filter(container_type):
     
 def separate_package(table):
     for idx,container_type in enumerate(table['container_type']):
-        table['container_type'][idx] = re.findall("[0-9]{2}[a-zA-Z]{2}",container_type)[0]
-        remaining = container_type.replace(table['container_type'][idx], '').split(';')
-        if len(remaining)>2:
-            table['chargeable_weight'][idx] = special_char_filter(remaining[0])
-            table['volume'][idx] = special_char_filter(remaining[1])
+        if container_type:
+            table['container_type'][idx] = re.findall("[0-9]{2}[a-zA-Z]{2}",container_type)[0]
+            remaining = container_type.replace(table['container_type'][idx], '').split(';')
+            if len(remaining)>=2:
+                table['chargeable_weight'][idx] = special_char_filter(remaining[0])
+                table['volume'][idx] = special_char_filter(remaining[1])
     return table
 
 def table_row_filter(table):
@@ -93,6 +97,20 @@ def table_row_filter(table):
             pass
     return formatted_table
 
+def evergreen_table_filter(table):
+    for idx, row in enumerate(table['container_number']):
+        new_container = container_separate(row)
+        if new_container: #and table['container_number'][idx]
+            row = row.split('/')
+            table['container_number'][idx] = new_container[0]
+            table['container_type'][idx] = special_char_filter(row[1])
+            table['seal'][idx] = special_char_filter(row[2])
+            if len(row) > 3:
+                table['package_count'][idx] = row[3]
+        else:
+            table['container_number'][idx] = None
+    return table
+
 def table_remove_null(table):
     indexes = sorted([i for i,x in enumerate(table['container_number']) if x is None], reverse=True)
     for col in table:
@@ -103,8 +121,6 @@ def table_remove_null(table):
 def form_recognizer_one(document, file_name, page_num, model_id=default_model_id):
     prediction={}
     table = defaultdict(list)
-
-    #table = {'container_number': [], 'seal': [], 'container_type':[], 'chargeable_weight':[], 'volume': [], 'package_count': []}
     poller = document_analysis_client.begin_analyze_document(model=model_id, document=document)
     result = poller.result()
 
@@ -260,7 +276,9 @@ def predict(file_bytes, filename, process_id, user_id):
                 
                 if carrier == 6: #attached cosco
                     predictions[split_file_name]['mbl_number'] = mbl_num_filter(predictions[split_file_name]['mbl_number'])
-                
+                if carrier == 8: #evergreen
+                    predictions[split_file_name]['table'] = evergreen_table_filter(predictions[split_file_name]['table'])
+                                
                 predictions[split_file_name] = mbl_filter(predictions[split_file_name])
                 predictions[split_file_name]['table'] = table_remove_null(predictions[split_file_name]['table'])
                 shared_invoice[split_file_name] = predictions[split_file_name]['mbl_number']
