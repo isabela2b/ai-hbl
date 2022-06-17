@@ -12,7 +12,8 @@ from PIL import Image
 
 hbl_page_model = keras.models.load_model('models/hbl_page.h5')
 classify_model = keras.models.load_model('models/reg_classifier.h5')
-mbl_carrier = keras.models.load_model('models/regclassify_carrier_256.h5')  
+mbl_carrier = keras.models.load_model('models/regclassify_carrier_256.h5')
+hbl_carrier = keras.models.load_model('models/hblclassify_carrier_256.h5')   
 ALLOWED_EXTENSIONS = set(['pdf', 'png', 'jpg', 'jpeg', 'bmp', 'docx', 'xlsx', 'xls','tiff'])
 
 #poppler_path = r"C:\Program Files\poppler-21.03.0\Library\bin"
@@ -50,3 +51,7 @@ def classify_page(image): #to make it easier i can just add if else, jesus!
 def classify_mbl_carrier(image): #to make it easier i can just add if else, jesus!
     image = img_preprocess(image, 256)
     return np.argmax(mbl_carrier.predict(image))
+
+def classify_hbl_carrier(image): #to make it easier i can just add if else, jesus!
+    image = img_preprocess(image, 256)
+    return np.argmax(hbl_carrier.predict(image))
