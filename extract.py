@@ -24,7 +24,7 @@ data_folder = "../ai-data/test-ftp-folder/"
 
 class_indices = {'hbl': 0, 'mbl': 1, 'others': 2}
 #mbl_carriers_indices = {0: 'anl', 1: 'anl-2', 2: 'carotrans', 3: 'cmacgm', 4: 'cmacgm-2', 5: 'cosco', 6: 'cosco-2', 7: 'direct', 8: 'evergreen', 9:'evergreen-2', 10: 'goldstar', 11: 'goldstar-2', 12: 'hamsud', 13: 'hapllo', 14: 'happlo-2', 15: 'hmm', 16: 'hmm-2', 17: 'maersk', 18: 'maersk-2', 19: 'mariana', 20: 'msc', 21: 'msc-2', 22: 'ocenet', 23: 'ocenet-2', 24: 'oocl', 25: 'oocl-2', 26: 'other', 27: 'pil', 28: 'sinotrans', 29: 'tslines', 30: 'tslines-2', 31: 'yangming'}
-mbl_carriers_match = {0: 'anl', 1: 'anl-2', 2: 'carotrans', 3: 'cmacgm', 4: 'cmacgm-2', 5:'mbl_cosco_16', 6:'mbl_attached_4', 7: 'direct', 8: 'mbl_evergreen_2', 9:'evergreen-2', 10: 'goldstar', 11: 'goldstar-2', 12: 'hamsud', 13: 'hapllo', 14: 'happlo-2', 15: 'mbl_hmm_1', 16: 'hmm-2', 17: 'maersk', 18: 'maersk-2', 19: 'mariana', 20: 'msc', 21: 'msc-2', 22: 'ocenet', 23: 'ocenet-2', 24: 'oocl', 25: 'oocl-2', 26: 'other', 27: 'pil', 28: 'sinotrans', 29: 'mbl_tslines_2', 30: 'tslines-2', 31: 'yangming'}
+mbl_carriers_match = {0: 'anl', 1: 'anl-2', 2: 'carotrans', 3: 'cmacgm', 4: 'cmacgm-2', 5:'mbl_cosco_16', 6:'mbl_attached_4', 7: 'direct', 8: 'mbl_evergreen_2', 9:'evergreen-2', 10: 'goldstar', 11: 'goldstar-2', 12: 'hamsud', 13: 'hapllo', 14: 'happlo-2', 15: 'mbl_hmm_1', 16: 'hmm-2', 17: 'maersk', 18: 'maersk-2', 19: 'mbl_mariana_1', 20: 'msc', 21: 'msc-2', 22: 'ocenet', 23: 'oocl', 24: 'oocl-2', 25: 'other', 26: 'pil', 27: 'sinotrans', 28: 'mbl_tslines_4', 29: 'tslines-2', 30: 'yangming'}
 hbl_carriers_match = {0: 'attached', 1: 'hbl_hls_6', 2: 'other', 3: 'hbl_sinotrans_2', 4: 'sinotrans-ver2'}
 
 
@@ -113,6 +113,17 @@ def evergreen_table_filter(table):
             table['seal'][idx] = special_char_filter(row[2])
             if len(row) > 3:
                 table['package_count'][idx] = row[3]
+        else:
+            table['container_number'][idx] = None
+    return table
+
+def tslines_table_filter(table):
+    for idx, row in enumerate(table['container_number']):
+        new_container = container_separate(row)
+        if new_container: #and table['container_number'][idx]
+            row = row.split('/')
+            table['container_number'][idx] = new_container[0]
+            table['container_type'][idx] = special_char_filter(row[1])
         else:
             table['container_number'][idx] = None
     return table
@@ -292,12 +303,15 @@ def predict(file_bytes, filename, process_id, user_id):
                     output.write(outputStream) #this can be moved to only save when the split file is AP
                 fd = open(split_file_path, "rb")
                 carrier = classify_mbl_carrier(image)
+                print(mbl_carriers_match[carrier])
                 predictions[split_file_name] = form_recognizer_one(document=fd.read(), file_name=filename, page_num=page_num, model_id=mbl_carriers_match[carrier])
                 
                 if carrier == 6: #attached cosco
                     predictions[split_file_name]['mbl_number'] = mbl_num_filter(predictions[split_file_name]['mbl_number'])
                 if carrier == 8: #evergreen
                     predictions[split_file_name]['table'] = evergreen_table_filter(predictions[split_file_name]['table'])
+                if carrier == 28: #tslines
+                    predictions[split_file_name]['table'] = tslines_table_filter(predictions[split_file_name]['table'])
                                 
                 predictions[split_file_name] = mbl_filter(predictions[split_file_name])
                 predictions[split_file_name]['table'] = table_remove_null(predictions[split_file_name]['table'])
