@@ -24,7 +24,7 @@ data_folder = "../ai-data/test-ftp-folder/"
 
 class_indices = {'hbl': 0, 'mbl': 1, 'others': 2}
 #mbl_carriers_indices = {0: 'anl', 1: 'anl-2', 2: 'carotrans', 3: 'cmacgm', 4: 'cmacgm-2', 5: 'cosco', 6: 'cosco-2', 7: 'direct', 8: 'evergreen', 9:'evergreen-2', 10: 'goldstar', 11: 'goldstar-2', 12: 'hamsud', 13: 'hapllo', 14: 'happlo-2', 15: 'hmm', 16: 'hmm-2', 17: 'maersk', 18: 'maersk-2', 19: 'mariana', 20: 'msc', 21: 'msc-2', 22: 'ocenet', 23: 'ocenet-2', 24: 'oocl', 25: 'oocl-2', 26: 'other', 27: 'pil', 28: 'sinotrans', 29: 'tslines', 30: 'tslines-2', 31: 'yangming'}
-mbl_carriers_match = {0: 'anl', 1: 'anl-2', 2: 'carotrans', 3: 'cmacgm', 4: 'cmacgm-2', 5:'mbl_cosco_16', 6:'mbl_attached_4', 7: 'direct', 8: 'mbl_evergreen_2', 9:'evergreen-2', 10: 'goldstar', 11: 'goldstar-2', 12: 'hamsud', 13: 'hapllo', 14: 'happlo-2', 15: 'mbl_hmm_1', 16: 'hmm-2', 17: 'maersk', 18: 'maersk-2', 19: 'mbl_mariana_1', 20: 'msc', 21: 'msc-2', 22: 'ocenet', 23: 'oocl', 24: 'oocl-2', 25: 'other', 26: 'pil', 27: 'sinotrans', 28: 'mbl_tslines_4', 29: 'tslines-2', 30: 'yangming'}
+mbl_carriers_match = {0: 'anl', 1: 'anl-2', 2: 'carotrans', 3: 'cmacgm', 4: 'cmacgm-2', 5:'mbl_cosco_16', 6:'mbl_attached_4', 7: 'direct', 8: 'mbl_evergreen_2', 9:'evergreen-2', 10: 'goldstar', 11: 'goldstar-2', 12: 'hamsud', 13: 'hapllo', 14: 'happlo-2', 15: 'mbl_hmm_1', 16: 'hmm-2', 17: 'maersk', 18: 'maersk-2', 19: 'mbl_mariana_2', 20: 'msc', 21: 'msc-2', 22: 'ocenet', 23: 'oocl', 24: 'oocl-2', 25: 'other', 26: 'pil', 27: 'sinotrans', 28: 'mbl_tslines_4', 29: 'tslines-2', 30: 'yangming'}
 hbl_carriers_match = {0: 'attached', 1: 'hbl_hls_6', 2: 'other', 3: 'hbl_sinotrans_2', 4: 'sinotrans-ver2'}
 
 
@@ -69,6 +69,15 @@ def gen_table_filter(table):
     table['container_number'] = [container_separate(container)[0] for container in table['container_number']]
     return table
 
+def table_filter(table):
+    try:
+        table['container_number'] = [container_separate(container)[0] for container in table['container_number']]
+        table['container_type'] = [container_type_filter(container) for container in table['container_type']]
+        table['chargeable_weight'] = [re.sub('[^\w. ]+', '', container) for container in table['chargeable_weight']]
+    except:
+        pass
+    return table
+
 def find_release_type(surrendered, telex_release, ebl, number_original):
     release_type = "OBR"
     if surrendered or telex_release or ebl or (number_original and any(map(number_original.lower().__contains__, ["one", "zero", "1", "0", "none"]))):
@@ -76,7 +85,7 @@ def find_release_type(surrendered, telex_release, ebl, number_original):
     return release_type
 
 def container_type_filter(container_type):
-    return re.findall("[0-9]{2}[a-zA-Z]{2}", container_type)[0]
+    return re.findall("[0-9]{2}\s[a-zA-Z]{2}", container_type)[0]
     
 def separate_package(table):
     for idx,container_type in enumerate(table['container_type']):
@@ -308,10 +317,12 @@ def predict(file_bytes, filename, process_id, user_id):
                 
                 if carrier == 6: #attached cosco
                     predictions[split_file_name]['mbl_number'] = mbl_num_filter(predictions[split_file_name]['mbl_number'])
-                if carrier == 8: #evergreen
+                elif carrier == 8: #evergreen
                     predictions[split_file_name]['table'] = evergreen_table_filter(predictions[split_file_name]['table'])
-                if carrier == 28: #tslines
+                elif carrier == 28: #tslines
                     predictions[split_file_name]['table'] = tslines_table_filter(predictions[split_file_name]['table'])
+                else:
+                    predictions[split_file_name]['table'] = table_filter(predictions[split_file_name]['table'])
                                 
                 predictions[split_file_name] = mbl_filter(predictions[split_file_name])
                 predictions[split_file_name]['table'] = table_remove_null(predictions[split_file_name]['table'])
