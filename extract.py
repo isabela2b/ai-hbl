@@ -24,9 +24,9 @@ data_folder = "../ai-data/test-ftp-folder/"
 
 class_indices = {'hbl': 0, 'mbl': 1, 'others': 2}
 #mbl_carriers_indices = {0: 'anl', 1: 'anl-2', 2: 'carotrans', 3: 'cmacgm', 4: 'cmacgm-2', 5: 'cosco', 6: 'cosco-2', 7: 'direct', 8: 'evergreen', 9:'evergreen-2', 10: 'goldstar', 11: 'goldstar-2', 12: 'hamsud', 13: 'hapllo', 14: 'happlo-2', 15: 'hmm', 16: 'hmm-2', 17: 'maersk', 18: 'maersk-2', 19: 'mariana', 20: 'msc', 21: 'msc-2', 22: 'ocenet', 23: 'ocenet-2', 24: 'oocl', 25: 'oocl-2', 26: 'other', 27: 'pil', 28: 'sinotrans', 29: 'tslines', 30: 'tslines-2', 31: 'yangming'}
-mbl_carriers_match = {0: 'anl', 1: 'anl-2', 2: 'carotrans', 3: 'cmacgm', 4: 'cmacgm-2', 5:'mbl_cosco_16', 6:'mbl_attached_4', 7: 'direct', 8: 'mbl_evergreen_2', 9:'evergreen-2', 10: 'mbl_goldstar_2', 11: 'mbl_goldstar2', 12: 'hamsud', 13: 'hapllo', 14: 'happlo-2', 15: 'mbl_hmm_1', 16: 'hmm-2', 17: 'maersk', 18: 'maersk-2', 19: 'mbl_mariana_2', 20: 'msc', 21: 'msc-2', 22: 'ocenet', 23: 'oocl', 24: 'oocl-2', 25: 'other', 26: 'pil', 27: 'sinotrans', 28: 'mbl_tslines_4', 29: 'tslines-2', 30: 'yangming'}
-mbl_carriers = {0: 'ANL', 1: 'ANL', 2: 'Carotrans', 3: 'Cmacgm', 4: 'Cmacgm-2', 5:'COSCO SHIPPING LINES CO ., LTD.', 6:'COSCO SHIPPING LINES CO ., LTD.', 7: 'Direct Shipping', 8: 'Evergreen', 9:'Evergreen', 10: 'Gold Star Line Ltd.', 11: 'Gold Star Line Ltd.', 12: 'Hamburg Sud', 13: 'Hapag Lloyd', 14: 'Hapag Lloyd', 15: 'HMM', 16: 'HMM', 17: 'Maersk', 18: 'Maersk', 19: 'Mariana', 20: 'MSC', 21: 'MSC', 22: 'Ocean Network Express', 23: 'OOCL', 24: 'OOCL', 25: None, 26: 'PIL', 27: 'Sinotrans', 28: 'TS Lines', 29: 'TS Lines', 30: 'Yangming'}
-hbl_carriers_match = {0: 'attached', 1: 'hbl_hls_6', 2: 'other', 3: 'hbl_sinotrans_2', 4: 'sinotrans-ver2'}
+mbl_carriers_match = {0: 'anl', 1: 'anl-2', 2: 'carotrans', 3: 'cmacgm', 4: 'cmacgm-2', 5:'mbl_cosco_17', 6:'mbl_attached_4', 7: 'direct', 8: 'mbl_evergreen_3', 9:'evergreen-2', 10: 'mbl_goldstar_3', 11: 'mbl_goldstar2', 12: 'hamsud', 13: 'hapllo', 14: 'happlo-2', 15: 'mbl_hmm_2', 16: 'hmm-2', 17: 'maersk', 18: 'maersk-2', 19: 'mbl_mariana_3', 20: 'msc', 21: 'mbl_msc2', 22: 'ocenet', 23: 'oocl', 24: 'oocl-2', 25: 'other', 26: 'pil', 27: 'sinotrans', 28: 'mbl_tslines_5', 29: 'tslines-2', 30: 'yangming'}
+mbl_carriers = {0: 'ANL', 1: 'ANL', 2: 'Carotrans', 3: 'Cmacgm', 4: 'Cmacgm-2', 5:'COSCO SHIPPING LINES CO ., LTD.', 6:'COSCO SHIPPING LINES CO ., LTD.', 7: 'Direct Shipping', 8: 'Evergreen Line', 9:'Evergreen Line', 10: 'Gold Star Line Ltd.', 11: 'Gold Star Line Ltd.', 12: 'Hamburg Sud', 13: 'Hapag Lloyd', 14: 'Hapag Lloyd', 15: 'HMM', 16: 'HMM', 17: 'Maersk', 18: 'Maersk', 19: 'Mariana Express Lines Pte Ltd', 20: 'MSC', 21: 'MSC', 22: 'Ocean Network Express', 23: 'OOCL', 24: 'OOCL', 25: None, 26: 'PIL', 27: 'Sinotrans', 28: 'T.S. LINES', 29: 'T.S. LINES', 30: 'Yangming'}
+hbl_carriers_match = {0: 'attached', 1: 'hbl_hls_7', 2: 'other', 3: 'hbl_sinotrans_3', 4: 'sinotrans-ver2'}
 
 
 def container_separate(containers):
@@ -177,7 +177,7 @@ def form_recognizer_one(document, file_name, page_num, carrier, model_id=default
                             table[key].append(special_char_filter(item.value))
                         else:
                             table[key].append(item.value)
-            elif name=='carrier' and not field.value:
+            elif name=='carrier': #and not field.value
                 prediction[name]=carrier
             else:
                 prediction[name]=field.value
