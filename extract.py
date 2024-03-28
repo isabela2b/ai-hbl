@@ -284,7 +284,7 @@ def predict(file_bytes, filename, process_id, user_id):
 
     if ext == "pdf":
         images = convert_from_bytes(file_bytes, grayscale=True, fmt="jpeg") #, poppler_path=poppler_path
-        inputpdf = PdfFileReader(io.BytesIO(file_bytes), strict=False)
+        inputpdf = PdfReader(io.BytesIO(file_bytes), strict=False)
         if inputpdf.isEncrypted:
             try:
                 inputpdf.decrypt('')
@@ -297,8 +297,8 @@ def predict(file_bytes, filename, process_id, user_id):
             pred = classify_page(image)
             if pred == class_indices['hbl']:
                 #if hbl_page(image) == 1:
-                output = PdfFileWriter()
-                output.addPage(inputpdf.getPage(page)) #pages begin at zero in pdffilewriter
+                output = PdfWriter()
+                output.add_page(inputpdf.pages[page]) #pages begin at zero in pdffilewriter
                 page_num = page+1 #for counters to begin at 1
                 split_file_name = file_name(filename) +"_pg"+str(page_num)+".pdf"
                 split_file_path = data_folder+"SPLIT/"+split_file_name
@@ -318,8 +318,8 @@ def predict(file_bytes, filename, process_id, user_id):
                 predictions[split_file_name]['table'] = table_remove_null(predictions[split_file_name]['table'])
 
             elif pred == class_indices['mbl']:
-                output = PdfFileWriter()
-                output.addPage(inputpdf.getPage(page)) #pages begin at zero in pdffilewriter
+                output = PdfWriter()
+                output.add_page(inputpdf.pages[page]) #pages begin at zero in pdffilewriter
                 page_num = page+1 #for counters to begin at 1
                 split_file_name = file_name(filename) +"_pg"+str(page_num)+".pdf"
                 split_file_path = data_folder+"SPLIT/"+split_file_name
