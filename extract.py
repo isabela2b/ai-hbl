@@ -286,7 +286,7 @@ def predict(file_bytes, filename, process_id, user_id):
     if ext == "pdf":
         images = convert_from_bytes(file_bytes, grayscale=True, fmt="jpeg") #, poppler_path=poppler_path
         inputpdf = PdfReader(io.BytesIO(file_bytes), strict=False)
-        if inputpdf.isEncrypted:
+        if inputpdf.is_encrypted:
             try:
                 inputpdf.decrypt('')
                 print('File Decrypted (PyPDF2)')
