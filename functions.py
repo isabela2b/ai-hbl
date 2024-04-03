@@ -6,7 +6,6 @@ import keras
 import os, shutil
 
 from datetime import datetime
-from PyPDF2 import PdfFileWriter, PdfFileReader
 from pdf2image import convert_from_path
 from PIL import Image
 

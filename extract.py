@@ -4,7 +4,8 @@ import numpy as np
 import pymssql
 from pymssql import _mssql
 from pdf2image import convert_from_bytes
-from PyPDF2 import PdfFileMerger
+from PyPDF2 import PdfWriter, PdfReader, PdfMerger
+
 from PIL import Image
 from collections import defaultdict
 
