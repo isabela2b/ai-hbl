@@ -1,4 +1,4 @@
-import os, shutil, json, glob, re, io, cv2 #keras
+import os, shutil, json, glob, re, io, cv2, requests #keras
 import pandas as pd
 import numpy as np
 import pymssql
@@ -366,9 +366,7 @@ def predict(file_bytes, filename, process_id, user_id):
             predictions[file]['release_type'] = find_release_type(predictions[file]['surrendered'],predictions[file]['telex_release'], predictions[file]['ebl'], predictions[file]['number_original'])
             hbl_list.append(predictions[file])
 
-        y = json.dumps(predictions[file], indent=4)
-        with open(data_folder+'PREDICTIONS/'+file_name(file)+'.json', 'w') as outfile:
-            outfile.write(y)
+        r = requests.post("https://cargomation.com:5201/redis/apinvoice/shipmentreg_hblmbl", auth=('admin', r'u\}M[6zzAU@w8YLx'), headers={'Content-Type': 'application/json'}, data=json.dumps(predictions[file]))
 
     if hbl_list: 
         payload["HBL"] = hbl_list
