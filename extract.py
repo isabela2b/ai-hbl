@@ -366,11 +366,10 @@ def predict(file_bytes, filename, process_id, user_id):
             predictions[file]['release_type'] = find_release_type(predictions[file]['surrendered'],predictions[file]['telex_release'], predictions[file]['ebl'], predictions[file]['number_original'])
             hbl_list.append(predictions[file])
 
-        r = requests.post("https://cargomation.com:5201/redis/apinvoice/shipmentreg_hblmbl", auth=('admin', r'u\}M[6zzAU@w8YLx'), headers={'Content-Type': 'application/json'}, data=json.dumps(predictions[file]))
-
     if hbl_list: 
         payload["HBL"] = hbl_list
 
     #push_parsed_inv(json.dumps(payload), process_id, user_id)
+    r = requests.post("https://cargomation.com:5201/redis/apinvoice/shipmentreg_hblmbl", auth=('admin', r'u\}M[6zzAU@w8YLx'), headers={'Content-Type': 'application/json'}, data=json.dumps(payload))
 
     return payload
